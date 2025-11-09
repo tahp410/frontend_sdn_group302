@@ -19,4 +19,8 @@ export const approveClub = async (clubId) => {
 export const addMemberToClub = async (clubId, userId) => {
   return await api.post("/clubs/add-member", { clubId, userId });
 };
-export const joinClub = (data) => api.post("/clubs/add-member", data);
+
+// Lấy clubs mà user là manager (bao gồm cả pending và approved)
+export const getMyManagedClubs = async () => {
+  return await api.get("/clubs/my-clubs");
+};

@@ -134,7 +134,133 @@
 
   .message {
     margin-top: 10px;
-    color: #2e7d32;
+    padding: 10px;
+    border-radius: 8px;
     font-weight: 500;
+    
+    &.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    
+    &.error {
+      background: #ffebee;
+      color: #c62828;
+    }
+  }
+
+  .request-status {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+
+    &.pending {
+      background: #fff8e1;
+      color: #f9a825;
+    }
+
+    &.rejected {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+    }
+  }
+}
+
+// Request Form Modal
+.request-form-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.request-form {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+
+  h3 {
+    color: #ff6600;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      min-height: 100px;
+
+      &:focus {
+        outline: none;
+        border-color: #ff6600;
+      }
+    }
+  }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s;
+
+      &.cancel-btn {
+        background: #f5f5f5;
+        color: #333;
+
+        &:hover {
+          background: #e0e0e0;
+        }
+      }
+
+      &.submit-btn {
+        background: #ff6600;
+        color: #fff;
+
+        &:hover:not(:disabled) {
+          background: #e65c00;
+        }
+
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+    }
   }
 }
