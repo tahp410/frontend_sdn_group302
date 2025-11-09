@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getClubDetailById, joinClub } from "../../services/club";
+import { getClubDetailById } from "../../services/club";
+import { createRequest, getAllRequests } from "../../services/request";
 import "./clubdetail.scss";
 
 const ClubDetail = () => {
@@ -10,6 +11,10 @@ const ClubDetail = () => {
   const [loading, setLoading] = useState(true);
   const [joined, setJoined] = useState(false);
   const [message, setMessage] = useState("");
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestMessage, setRequestMessage] = useState("");
+  const [requestStatus, setRequestStatus] = useState(null); // pending, accepted, rejected
+  const [loadingRequest, setLoadingRequest] = useState(false);
 
   const userInfo = JSON.parse(localStorage.getItem("userInfo"));
 
@@ -24,6 +29,31 @@ const ClubDetail = () => {
           (m) => m.userId?._id === userInfo?.user?._id
         );
         setJoined(isMember);
+
+        // Kiểm tra request status nếu user đã đăng nhập
+        if (userInfo?.user?._id && !isMember) {
+          try {
+            const { data: requestsData } = await getAllRequests({
+              clubId: id,
+              studentId: userInfo.user._id,
+            });
+            
+            if (requestsData?.data && requestsData.data.length > 0) {
+              // Lấy request mới nhất (đã được sort từ backend)
+              const latestRequest = requestsData.data[0];
+              // Chỉ hiển thị status nếu request chưa được xử lý hoặc bị reject
+              if (latestRequest.status === "pending" || latestRequest.status === "rejected") {
+                setRequestStatus(latestRequest.status);
+              } else if (latestRequest.status === "accepted") {
+                // Nếu đã được accept, refresh lại để kiểm tra membership
+                setRequestStatus("accepted");
+              }
+            }
+          } catch (err) {
+            console.error("Lỗi khi kiểm tra request:", err);
+            // Nếu có lỗi (có thể do chưa đăng nhập), không làm gì
+          }
+        }
       } catch (err) {
         console.error("Lỗi khi lấy thông tin CLB:", err);
         setMessage("Không thể tải thông tin câu lạc bộ.");
@@ -32,20 +62,33 @@ const ClubDetail = () => {
       }
     };
     fetchClub();
-  }, [id]);
+  }, [id, userInfo]);
 
-  const handleJoinClub = async () => {
+  const handleJoinClick = () => {
+    if (!userInfo) {
+      navigate("/login");
+      return;
+    }
+    setShowRequestForm(true);
+  };
+
+  const handleSubmitRequest = async (e) => {
+    e.preventDefault();
+    setLoadingRequest(true);
+    setMessage("");
+
     try {
-      const payload = {
-        clubId: id,
-        userId: userInfo?.user?._id,
-      };
-      await joinClub(payload);
-      setMessage("Tham gia CLB thành công!");
-      setJoined(true);
+      await createRequest(id, requestMessage);
+      setMessage("Đã gửi yêu cầu tham gia thành công! Vui lòng chờ manager xét duyệt.");
+      setRequestStatus("pending");
+      setShowRequestForm(false);
+      setRequestMessage("");
     } catch (error) {
-      console.error(error);
-      setMessage("Lỗi khi tham gia CLB.");
+      setMessage(
+        error.response?.data?.error || "Lỗi khi gửi yêu cầu tham gia."
+      );
+    } finally {
+      setLoadingRequest(false);
     }
   };
 
@@ -100,18 +143,76 @@ const ClubDetail = () => {
             )}
           </div>
 
-          {!joined && (
-            <button className="join-btn" onClick={handleJoinClub}>
-              Tham gia CLB
+          {/* Hiển thị button và form request */}
+          {!userInfo ? (
+            <button className="join-btn" onClick={() => navigate("/login")}>
+              Đăng nhập để tham gia
             </button>
-          )}
-          {joined && (
+          ) : joined ? (
             <button className="joined-btn" disabled>
               ✅ Đã tham gia
             </button>
+          ) : requestStatus === "pending" ? (
+            <div className="request-status pending">
+              <p>⏳ Yêu cầu tham gia đang chờ duyệt...</p>
+            </div>
+          ) : requestStatus === "accepted" ? (
+            <button className="joined-btn" disabled>
+              ✅ Đã được chấp nhận
+            </button>
+          ) : requestStatus === "rejected" ? (
+            <div className="request-status rejected">
+              <p>❌ Yêu cầu tham gia đã bị từ chối</p>
+              <button className="join-btn" onClick={handleJoinClick}>
+                Gửi lại yêu cầu
+              </button>
+            </div>
+          ) : (
+            <button className="join-btn" onClick={handleJoinClick}>
+              Tham gia CLB
+            </button>
           )}
 
-          {message && <p className="message">{message}</p>}
+          {/* Form request */}
+          {showRequestForm && (
+            <div className="request-form-overlay" onClick={() => setShowRequestForm(false)}>
+              <div className="request-form" onClick={(e) => e.stopPropagation()}>
+                <h3>Gửi yêu cầu tham gia</h3>
+                <form onSubmit={handleSubmitRequest}>
+                  <div className="form-group">
+                    <label>Lời nhắn (tùy chọn)</label>
+                    <textarea
+                      value={requestMessage}
+                      onChange={(e) => setRequestMessage(e.target.value)}
+                      placeholder="Hãy giới thiệu về bản thân và lý do bạn muốn tham gia..."
+                      rows="4"
+                    />
+                  </div>
+                  <div className="form-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRequestForm(false);
+                        setRequestMessage("");
+                      }}
+                      className="cancel-btn"
+                    >
+                      Hủy
+                    </button>
+                    <button type="submit" disabled={loadingRequest} className="submit-btn">
+                      {loadingRequest ? "Đang gửi..." : "Gửi yêu cầu"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {message && (
+            <div className={`message ${message.includes("thành công") ? "success" : "error"}`}>
+              {message}
+            </div>
+          )}
         </div>
       </div>
     </div>

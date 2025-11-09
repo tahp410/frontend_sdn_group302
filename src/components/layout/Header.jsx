@@ -24,6 +24,12 @@ const Header = () => {
           {userInfo ? (
             <>
               <Link to="/profile">Hồ sơ</Link>
+              {userInfo.user?.role === "manager" && (
+                <Link to="/manager/requests">Quản lý yêu cầu</Link>
+              )}
+              {userInfo.user?.role === "admin" && (
+                <Link to="/admin">Quản trị</Link>
+              )}
               <button className="btn-logout" onClick={handleLogout}>
                 Đăng xuất
               </button>
