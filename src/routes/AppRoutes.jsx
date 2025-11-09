@@ -15,6 +15,8 @@ import EventDetail from "../page/Anonymous/EventDetail";
 
 import AdminRoute from "./adminRouter";
 import ProtectedRoute from "./protectRouter";
+import ManagerRoute from "./managerRouter";
+import ManagerRequests from "../page/Manager/ManagerRequests";
 
 const AppRoutes = () => {
   return (
@@ -63,6 +65,16 @@ const AppRoutes = () => {
         }
       />
 
+      {/* 📋 Manager routes */}
+      <Route
+        path="/manager/requests"
+        element={
+          <ManagerRoute>
+            <ManagerRequests />
+          </ManagerRoute>
+        }
+      />
+
       {/* 🏠 Default redirect */}
       <Route
         path="/"
@@ -71,11 +83,13 @@ const AppRoutes = () => {
           if (!userInfoStr) return <Navigate to="/event" />;
           try {
             const userInfo = JSON.parse(userInfoStr);
-            return userInfo?.user?.role === "admin" ? (
-              <Navigate to="/admin" />
-            ) : (
-              <Navigate to="/student" />
-            );
+            if (userInfo?.user?.role === "admin") {
+              return <Navigate to="/admin" />;
+            } else if (userInfo?.user?.role === "manager") {
+              return <Navigate to="/manager/requests" />;
+            } else {
+              return <Navigate to="/student" />;
+            }
           } catch {
             localStorage.removeItem("userInfo");
             return <Navigate to="/login" />;
