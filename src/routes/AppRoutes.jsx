@@ -11,6 +11,7 @@ import AdminHome from "../page/Admin/AdminHome";
 import EventList from "../page/Anonymous/Event";
 import ClubList from "../page/Anonymous/Club";
 import ClubDetail from "../page/Anonymous/ClubDetail";
+import EventDetail from "../page/Anonymous/EventDetail";
 
 import AdminRoute from "./adminRouter";
 import ProtectedRoute from "./protectRouter";
@@ -25,6 +26,7 @@ const AppRoutes = () => {
       <Route path="/club" element={<ClubList />} />
       <Route path="/club/:id" element={<ClubDetail />} />
       <Route path="/club/:id" element={<ClubDetail />} />
+      <Route path="/event/:id" element={<EventDetail />} />
       {/* 👤 Protected routes */}
       <Route
         path="/profile"
