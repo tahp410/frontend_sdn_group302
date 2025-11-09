@@ -11,5 +11,5 @@ export const getEventById = async (id) => {
 // Tham gia một sự kiện
 export const joinEvent = async (eventId, userId) => {
   // Gửi yêu cầu POST tới /api/events/participants/:id với userId trong body
-  return await api.post(`/api/events/participants/${eventId}`, { userId });
+  return await api.post(`/events/participants/${eventId}`, { userId });
 };
