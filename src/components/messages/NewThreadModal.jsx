@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import "./messages.scss";
 import { fetchMessageUsers } from "../../services/message";
+import { getClubMembers, getMyMemberClubs } from "../../services/club";
 
 const createDefaultForm = () => ({
   type: "DIRECT",
@@ -17,6 +18,10 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [clubOptions, setClubOptions] = useState([]);
+  const [clubsLoading, setClubsLoading] = useState(false);
+  const [clubMembers, setClubMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
 
   const loadUsers = useCallback(
     async (searchTerm = "") => {
@@ -40,6 +45,49 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
     []
   );
 
+  const loadClubMembers = useCallback(async (clubId) => {
+    if (!clubId) {
+      setClubMembers([]);
+      return;
+    }
+
+    setMembersLoading(true);
+    try {
+      const response = await getClubMembers(clubId);
+      const members = response.data?.data?.members || [];
+      setClubMembers(members);
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Không thể tải danh sách thành viên CLB."
+      );
+      setClubMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, []);
+
+  const loadUserClubs = useCallback(async () => {
+    setClubsLoading(true);
+    try {
+      const response = await getMyMemberClubs();
+      const clubs = response.data?.data || [];
+      setClubOptions(clubs);
+      return clubs;
+    } catch (err) {
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Không thể tải danh sách CLB của bạn."
+      );
+      setClubOptions([]);
+      return [];
+    } finally {
+      setClubsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -48,19 +96,102 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
     setForm(createDefaultForm());
     setError("");
     setUserSearch("");
+    setClubOptions([]);
+    setClubMembers([]);
     loadUsers();
   }, [isOpen, loadUsers]);
+
+  useEffect(() => {
+    if (!isOpen || form.type !== "USER_CLUB") {
+      return;
+    }
+
+    if (clubOptions.length === 0) {
+      let isMounted = true;
+      const fetchClubs = async () => {
+        const clubs = await loadUserClubs();
+        if (!isMounted) {
+          return;
+        }
+        if (!form.clubId && clubs.length > 0) {
+          const defaultClubId = clubs[0]?._id || "";
+          setForm((prev) => ({
+            ...prev,
+            clubId: defaultClubId,
+            content:
+              prev.content && prev.content.trim().length > 0
+                ? prev.content
+                : clubs[0]?.name
+                ? `CLUB_${clubs[0].name}`
+                : prev.content,
+          }));
+        }
+      };
+
+      fetchClubs();
+
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!form.clubId && clubOptions.length > 0) {
+      const defaultClub = clubOptions[0];
+      setForm((prev) => ({
+        ...prev,
+        clubId: defaultClub?._id || "",
+        content:
+          prev.content && prev.content.trim().length > 0
+            ? prev.content
+            : defaultClub?.name
+            ? `CLUB_${defaultClub.name}`
+            : prev.content,
+      }));
+    }
+  }, [isOpen, form.type, form.clubId, clubOptions, loadUserClubs]);
+
+  useEffect(() => {
+    if (!isOpen || form.type !== "USER_CLUB") {
+      return;
+    }
+
+    if (form.clubId) {
+      loadClubMembers(form.clubId);
+    } else {
+      setClubMembers([]);
+    }
+  }, [isOpen, form.type, form.clubId, loadClubMembers]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
 
     if (name === "type") {
+      if (value === "USER_CLUB") {
+        setClubOptions([]);
+        setClubMembers([]);
+      }
       setForm({
         type: value,
         participantIds: value === "DIRECT" ? [] : "",
         clubId: "",
         eventId: "",
         content: "",
+      });
+      setError("");
+      return;
+    }
+
+    if (name === "clubId") {
+      setForm((prev) => {
+        const selected = clubOptions.find((club) => club._id === value);
+        const autoLabel = selected?.name ? `CLUB_${selected.name}` : prev.content;
+        const shouldAutoFill =
+          !prev.content || prev.content.startsWith("CLUB_");
+        return {
+          ...prev,
+          clubId: value,
+          content: shouldAutoFill ? autoLabel : prev.content,
+        };
       });
       setError("");
       return;
@@ -123,13 +254,28 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
       }
 
       case "USER_CLUB": {
-        if (!form.participantIds.trim() || !form.clubId.trim()) {
-          throw new Error("Vui lòng nhập userId và clubId.");
+        if (!form.clubId.trim()) {
+          throw new Error("Vui lòng chọn câu lạc bộ.");
         }
-        return [
-          { userId: form.participantIds.trim() },
-          { clubId: form.clubId.trim() },
+
+        const allUserIds = [
+          ...new Set(
+            [
+              ...(clubMembers || []).map((member) => member?._id || member?.id),
+              ...(Array.isArray(form.participantIds)
+                ? form.participantIds
+                : []),
+              currentUserId,
+            ]
+              .filter(Boolean)
+              .map((id) => id.toString())
+          ),
         ];
+
+        const participants = allUserIds.map((userId) => ({ userId }));
+        participants.push({ clubId: form.clubId.trim() });
+
+        return participants;
       }
 
       case "CLUB_BROADCAST": {
@@ -158,10 +304,28 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
 
     try {
       const participants = buildParticipantsPayload();
+      const selectedClub = clubOptions.find((club) => club._id === form.clubId);
+      const groupLabel = selectedClub?.name
+        ? `CLUB_${selectedClub.name}`
+        : undefined;
+      const baseContent =
+        form.content && form.content.trim().length > 0
+          ? form.content.trim()
+          : form.type === "USER_CLUB"
+          ? groupLabel
+          : undefined;
+
       await onCreate({
         type: form.type,
         participants,
-        content: form.content.trim() || undefined,
+        content: baseContent,
+        meta:
+          form.type === "USER_CLUB"
+            ? {
+                clubId: form.clubId.trim(),
+                clubName: selectedClub?.name || "",
+              }
+            : undefined,
       });
 
       setForm(createDefaultForm());
@@ -225,24 +389,46 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
         return (
           <>
             <div className="messages__form-group">
-              <label>User ID</label>
-              <input
-                type="text"
-                name="participantIds"
-                value={form.participantIds}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div className="messages__form-group">
-              <label>Club ID</label>
-              <input
-                type="text"
+              <label>Chọn câu lạc bộ</label>
+              <select
                 name="clubId"
                 value={form.clubId}
                 onChange={handleChange}
+                disabled={clubsLoading || clubOptions.length === 0}
                 required
-              />
+              >
+                <option value="">-- Chọn câu lạc bộ --</option>
+                {clubOptions.map((club) => (
+                  <option key={club._id} value={club._id}>
+                    {club.name}
+                  </option>
+                ))}
+              </select>
+              {clubsLoading && <small>Đang tải danh sách CLB...</small>}
+              {!clubsLoading && clubOptions.length === 0 && (
+                <small>Bạn chưa tham gia câu lạc bộ nào.</small>
+              )}
+            </div>
+            <div className="messages__form-group">
+              <label>Thành viên CLB</label>
+              {membersLoading ? (
+                <div className="messages__placeholder">
+                  Đang tải danh sách thành viên...
+                </div>
+              ) : clubMembers.length === 0 ? (
+                <div className="messages__placeholder">
+                  Chưa có thành viên nào trong CLB.
+                </div>
+              ) : (
+                <ul>
+                  {clubMembers.map((member) => (
+                    <li key={member._id || member.id}>👤 {member.name}</li>
+                  ))}
+                </ul>
+              )}
+              <small>
+                Hội thoại sẽ tự động bao gồm tất cả thành viên của CLB.
+              </small>
             </div>
           </>
         );
@@ -313,7 +499,11 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
           {renderTypeFields()}
 
           <div className="messages__form-group">
-            <label>Tin nhắn đầu tiên (tuỳ chọn)</label>
+            <label>
+              {form.type === "USER_CLUB"
+                ? "Tên nhóm / tin nhắn đầu tiên"
+                : "Tin nhắn đầu tiên (tuỳ chọn)"}
+            </label>
             <textarea
               name="content"
               rows={3}
@@ -343,7 +533,7 @@ const NewThreadModal = ({ isOpen, onClose, onCreate, currentUserId }) => {
               className="messages__button messages__button--primary"
               disabled={submitting}
             >
-              {submitting ? "Đang tạo..." : "Tạo hội thoại"}
+              {submitting ? "Đang xử lý..." : "Tạo hội thoại"}
             </button>
           </div>
         </form>

@@ -42,7 +42,15 @@ export const getMyManagedClubs = async () => {
   return await api.get("/clubs/my-clubs");
 };
 
+export const getMyMemberClubs = async () => {
+  return await api.get("/clubs/mine");
+};
+
 // Admin: lấy danh sách CLB theo status (vd: pending)
 export const getClubsForAdmin = async (params = {}) => {
   return await api.get("/clubs/admin", { params });
+};
+
+export const getClubMembers = async (clubId) => {
+  return await api.get(`/clubs/${clubId}/members`);
 };

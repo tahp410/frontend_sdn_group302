@@ -25,6 +25,15 @@ const getParticipantLabel = (participant, currentUserId) => {
 };
 
 const buildThreadTitle = (thread, currentUserId) => {
+  if (thread?.type === "USER_CLUB") {
+    const clubParticipant = thread?.participants?.find(
+      (participant) => participant.club
+    );
+    if (clubParticipant?.club?.name) {
+      return `CLUB_${clubParticipant.club.name}`;
+    }
+  }
+
   const labels =
     thread?.participants
       ?.map((participant) => getParticipantLabel(participant, currentUserId))

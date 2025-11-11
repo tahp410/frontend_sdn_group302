@@ -61,7 +61,7 @@ const buildConversationHeader = (thread, currentUserId) => {
     case "USER_CLUB": {
       const clubName =
         participants.find((participant) => participant.club)?.club?.name || "";
-      title = clubName ? `với CLB ${clubName}` : "giữa người dùng và CLB";
+      title = clubName ? `CLUB_${clubName}` : "nhóm câu lạc bộ";
       break;
     }
     case "CLUB_BROADCAST": {
@@ -235,6 +235,37 @@ const Messages = () => {
     async (payload) => {
       setError("");
       try {
+        if (payload.type === "USER_CLUB") {
+          const targetClubId =
+            payload?.meta?.clubId ||
+            payload?.participants?.find((participant) => participant.clubId)
+              ?.clubId;
+
+          if (targetClubId) {
+            const existingThread = threads.find((thread) =>
+              thread.type === "USER_CLUB"
+                ? thread.participants?.some(
+                    (participant) =>
+                      participant.club &&
+                      (participant.club._id === targetClubId ||
+                        participant.club === targetClubId)
+                  )
+                : false
+            );
+
+            if (existingThread) {
+              setSelectedThread(existingThread);
+              setMessages([]);
+              setMessagesPage(1);
+              await Promise.all([
+                loadThreads(threadsPage),
+                loadMessages(existingThread.threadKey, 1, true),
+              ]);
+              return existingThread;
+            }
+          }
+        }
+
         const response = await createThread(payload);
         const newThread = response.data?.data;
         await loadThreads(1);
@@ -250,15 +281,17 @@ const Messages = () => {
           });
           await loadMessages(newThread.threadKey, 1, true);
         }
+        return newThread;
       } catch (err) {
         setError(
           err.response?.data?.error ||
             err.response?.data?.message ||
             "Không thể tạo hội thoại."
         );
+        throw err;
       }
     },
-    [loadMessages, loadThreads]
+    [threads, loadMessages, loadThreads, threadsPage]
   );
 
   const handleTogglePin = useCallback(
@@ -293,6 +326,19 @@ const Messages = () => {
 
     return () => window.clearInterval(intervalId);
   }, [selectedThread, loadThreads, loadMessages, threadsPage]);
+
+  useEffect(() => {
+    if (!selectedThread) {
+      return;
+    }
+
+    const updated = threads.find(
+      (thread) => thread.threadKey === selectedThread.threadKey
+    );
+    if (updated && updated !== selectedThread) {
+      setSelectedThread(updated);
+    }
+  }, [threads, selectedThread]);
 
   const handleLoadMoreMessages = useCallback(() => {
     if (
